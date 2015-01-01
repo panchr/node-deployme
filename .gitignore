@@ -1,5 +1,8 @@
 # Created by https://www.gitignore.io
 
+### deployme
+.deploy-config
+
 ### SublimeText ###
 # cache files for sublime text
 *.tmlanguage.cache
