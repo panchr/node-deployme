@@ -1,0 +1,20 @@
+{
+  "name": "git-server-deploy",
+  "version": "0.1.0",
+  "description": "An automated tool to deploy untracked files to servers (such as images) through the use of git hooks",
+  "main": "deploy.js",
+  "scripts": {
+    "test": ""
+  },
+  "keywords": [
+    "git",
+    "deploy",
+    "image"
+  ],
+  "author": "Rushy Panchal",
+  "license": "GPL v2.0",
+  "dependencies": {
+    "minimist": "^1.1.0",
+    "ssh2": "^0.3.6"
+  }
+}
