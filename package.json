@@ -1,6 +1,6 @@
 {
   "name": "deployme",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An automated tool to deploy untracked files to servers (such as images) through the use of git hooks",
   "main": "deploy.js",
   "scripts": {
@@ -13,7 +13,15 @@
     "static",
     "automated"
   ],
-  "author": "Rushy Panchal",
+  "author": {
+    "name": "Rushy Panchal",
+    "email": "panchal.rushy@gmail.com",
+    "url": "https://panchr.me"
+    },
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/panchr/node-deployme"
+      },
   "license": "GPL-2.0",
   "dependencies": {
     "minimist": "^1.1.0",
