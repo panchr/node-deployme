@@ -7,7 +7,7 @@ var fs = require("fs"),
 	minimist = require("minimist"),
 	prompt = require("prompt"),
 	underscore = require("underscore"),
-	Project = require("./project");
+	Deployer = require("./deployer");
 
 // Global configuration
 
@@ -30,7 +30,7 @@ var HELP_DATA = {
 prompt.message = "";
 prompt.delimiter = "";
 
-var project = new Project(".deploy-config");
+var project = new Deployer(".deploy-config");
 
 function main() {
 	// Main function
@@ -57,25 +57,29 @@ Delimit the list of local and remote lists with commas. The lengths of each shou
 		initializeProject("Reseting current configuration and restarting project.");
 		}
 	else {
-		// need to load configuration first
-		project.initialize();
+		project.initialize(); // load configuration and connect to the server
+
 		if (command("edit")) {
 			console.log(cli);
 			}
 		else if (command("view")) {
-			project.done('initialize', function() {
+			project.on('initialize', function() {
 				console.log(project.settings);
+				process.exit();
 				});
 			}
 		else if (command("diff")) {
-			project.done('connection', function() {
-				project.checkChanges().done(function() {
+			project.on('connect', function() {
+				project.checkChanges();
+				project.on('checkChanges', function() {
 					console.log(project.toSync);
+					process.exit();
 					});
 				});
 			}
 		else {
 			console.log("Command not found!");
+			process.exit();
 			}
 		}
 	}
@@ -89,15 +93,12 @@ function initializeProject(promptString) {
 		result.localRoots = result.localRoots.split(", ");
 		result.remoteRoots = result.remoteRoots.split(", ");
 		if (result.localRoots.length != result.remoteRoots.length) throw "Remote and local roots must have the same number of elements";
-		project.create(result).done(callbackLog("Done initializing project!"));
+		project.create(result);
+		project.on('create', function() {
+			console.log("Deploy configuration file, " + project.configurationPath.green + ", created with the provided options.\nDone initializing project!");
+			process.exit();
+			});
 		});
-	}
-
-function callbackLog(message) {
-	// Logs a message to the console as a callback
-	return function () {
-		console.log(message);
-		};
 	}
 
 main();

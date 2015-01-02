@@ -1,8 +1,9 @@
 {
   "name": "deployme",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An automated tool to deploy untracked files to servers (such as images) through the use of git hooks",
-  "main": "deploy.js",
+  "main": "cli.js",
+  "bin": "./cli.js",
   "scripts": {
     "test": ""
   },
