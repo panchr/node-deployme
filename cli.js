@@ -3,10 +3,11 @@
 // Licensed under GPL v2.0
 // Part of the deployme package
 
-var fs = require("fs"),
-	minimist = require("minimist"),
+var fs = require("fs");
+
+var minimist = require("minimist"),
 	prompt = require("prompt"),
-	underscore = require("underscore"),
+	_ = require("underscore"),
 	Deployer = require("./deployer");
 
 // Global configuration
@@ -16,8 +17,10 @@ var INPUT_PROPERTIES= [
 	{name: "port", description: "Port:".green},
 	{name: "username", description: "Username:".green},
 	{name: "password", description: "Password:".green, hidden: true},
-	{name: "localRoots", description: "Root Local Directories:".green},
-	{name: "remoteRoots", description: "Root Remote Directories:".green}
+	{name: "localRoot", description: "Root Local Directory:".green},
+	{name: "localDirectories", description: "Local directories:".green},
+	{name: "localFiles", description: "Local files:".green},
+	{name: "remoteRoot", description: "Root Remote Directory:".green}
 	];
 
 var HELP_DATA = {
@@ -34,9 +37,9 @@ var project = new Deployer(".deploy-config");
 
 function main() {
 	// Main function
-	var cli = minimist(process.argv.slice(2))
+	var cli = minimist(process.argv);
 	command = function(key) {
-		return (cli[key] || underscore.contains(cli._, key));
+		return (cli[key] || _.contains(cli._, key));
 		};
 
 	if (command("help")) {
@@ -47,7 +50,6 @@ otherwise add too much bulk to a git repository.");
 		for (var key in HELP_DATA) {
 			console.log("\t" + key.green + ": " + HELP_DATA[key]);
 			}
-		process.exit();
 		}
 	else if (command("init")) {
 		initializeProject("Welcome to deployme! To start, let's set up some configuration.\
@@ -58,28 +60,33 @@ Delimit the list of local and remote lists with commas. The lengths of each shou
 		}
 	else {
 		project.initialize(); // load configuration and connect to the server
-
-		if (command("edit")) {
-			console.log(cli);
-			}
-		else if (command("view")) {
-			project.on('initialize', function() {
-				console.log(project.settings);
-				process.exit();
-				});
+		if (command("view")) {
+			console.log(project.config);
 			}
 		else if (command("diff")) {
-			project.on('connect', function() {
-				project.checkChanges();
-				project.on('checkChanges', function() {
+			project.connect().calculate();
+			if (! project.toSync.syncCalculated) {
+				project.once('sync-calculated', function () {
 					console.log(project.toSync);
+					project.close();
 					process.exit();
 					});
+				}
+			else {
+				console.log(project.toSync);
+				project.close();
+				process.exit();
+				}
+			}
+		else if (command("sync")) {
+			project.run();
+			project.once('done', function () {
+				project.close();
+				process.exit();
 				});
 			}
 		else {
 			console.log("Command not found!");
-			process.exit();
 			}
 		}
 	}
@@ -90,14 +97,24 @@ function initializeProject(promptString) {
 	prompt.start();
 	prompt.get(INPUT_PROPERTIES, function (err, result) {
 		if (err) throw err;
-		result.localRoots = result.localRoots.split(", ");
-		result.remoteRoots = result.remoteRoots.split(", ");
-		if (result.localRoots.length != result.remoteRoots.length) throw "Remote and local roots must have the same number of elements";
-		project.create(result);
-		project.on('create', function() {
-			console.log("Deploy configuration file, " + project.configurationPath.green + ", created with the provided options.\nDone initializing project!");
-			process.exit();
-			});
+		var config = {
+			host: result.host,
+			port: result.port,
+			username: result.username,
+			password: result.password,
+			local: {
+				root: result.localRoot,
+				directories: _.map(result.localDirectories.split(", "), function (dirPath) {return "/" + dirPath}),
+				files: result.localFiles.split(", ")
+				},
+			remote: {
+				root: result.remoteRoot,
+				}
+			};
+
+		fs.writeFileSync(".deploy-config", JSON.stringify(config));
+		console.log("Deploy configuration file, " + project.configurationPath.green + ", created with the provided options.\nDone initializing project!");
+		process.exit();
 		});
 	}
 

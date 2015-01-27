@@ -1,126 +1,257 @@
-// project.js
+// deployme.js
 // Rushy Panchal
-// Licensed under the GPL v2.0
-// Part of the deployme package
+// Syncs multiple folders to a remote directory
+
+var EventEmitter = require("events").EventEmitter,
+	_ = require("underscore"),
+	Connection = require("ssh2");
 
 var fs = require("fs"),
-	Connection = require("ssh2"),
-	underscore = require("underscore"),
-	emitter = require("events").EventEmitter;
+	path = require("path"),
+	util = require("util");
 
-/*
-* Creates a new project object
-* @param configPath - path of the configuration file (defaults to ".deploy-config")
-* @return Project object
-*/
-function Project(configPath) {
-	var configPath = configPath || ".deploy-config";
-	this.configurationPath = configPath;
-	this.settings = {};
-	this.toSync = {
-		remoteAdd: [],
-		remoteRemove: []
-		};
+var emitter = new EventEmitter();
+
+function Sync(path) {
+	// Create a new file syncer
+	this.configurationPath = path;
+	this.config = null;
 	this.connection = null;
-	this.server = null;
-	emitter.call(this);
-	return this;
+	this.sftp = null;
+	this.toSync = {
+		syncCalculated: false,
+		syncCompleted: true,
+		stepsCompleted: 0,
+		filesCompleted: 0,
+		remoteAdd: {},
+		remoteUpdate: {},
+		remoteDelete: [],
+		};
 	}
 
-Project.prototype.__proto__ = emitter.prototype; // Allow all emitter objects to exist for this as well
+util.inherits(Sync, EventEmitter);
 
-/*
-* Create a new project from a set of options
-* @param options.host - Host name of the remote server
-* @param options.port - Port to use when connecting to the remote server
-* @param options.username - Username to login with
-* @param options.password - Password to login to the server
-* @param callback (optional) - A callback function when the initialization is complete (this.on is preferred)
-* @return The current Project object
-*/
-Project.prototype.create = function(options, callback) {
-	var functionName = "create";
-	callback ? this.on(functionName, callback): null;
-	var projectObj = this;
-	fs.writeFile(this.configurationPath, JSON.stringify(options), function (err) {
-		if (err) throw err;
-		projectObj.settings = options;
-		projectObj.emit(functionName);
-		});
-	return this;
-	};
-
-/*
-* Loads the project initialize
-* @param callback (optional) -  A callback function for when the initialization is complete (this.on is preferred)
-* @return The current Project object
-* @event initialize - when the settings have been loaded (but NOT when the server is connected)
-* @event connect - when the SFTP server has been successfully connected to
-*/
-Project.prototype.initialize = function(callback) {
-	var functionName = "initialize";
-	callback ? this.on(functionName, callback): null;
-	var projectObj = this;
-	fs.readFile(this.configurationPath, "utf8", function(err, data) {
-		if (err) throw err;
-		var settings = JSON.parse(data);
-		projectObj.settings = settings;
-		projectObj.connection = new Connection();
-		projectObj.connection.on('ready', function () {
-			 projectObj.connection.sftp(function (err, sftp) {
-			 	if (err) throw err;
-			 	projectObj.server = sftp;
-			 	projectObj.emit('connect');
-			 	});
-			}).connect({
-				host: settings.host,
-				port: settings.port,
-				username: settings.username,
-				password: settings.password
-				});
-		projectObj.emit(functionName);
-		});
-	return this;
-	}
-
-/*
-* Checks the directory for changes
-* @param callback (optional) - A callback function for when the check is completed
-* @return The current Project object
-* @event checkChanges - when the function has completely finished executing; this makes Project.toSync available
-*/
-Project.prototype.checkChanges = function(callback) {
-	var functionName = "checkChanges";
-	callback ? this.on(functionName, callback): null;
-	var projectObj = this;
-	if (! this.server) // server connection not yet established
-		throw "Server SFTP connection has not yet been established. Please use Project.on('connection', callback) to wait for the connection.";
-	else if (this.toSync.remoteAdd.length > 0 || this.toSync.remoteRemove.length > 0)
-		throw "Currently syncing. Use Project.on('sync', callback) to wait for the sync to finish.";
-	var localRoots = this.settings.localRoots, remoteRoots = this.settings.remoteRoots;
-	for (var index = localRoots.length -1; index >= 0; index--) {
-		var localPath = localRoots[index], remotePath =remoteRoots[index];
-		console.log(index);
-		function asyncHelper(project, lastItem) {
-			project.server.readdir(remotePath, function (err, remoteList) {
-				if (err) throw err;
-				var remoteList = underscore.map(remoteList, function (file) {
-					return file.filename;
-					});
-				fs.readdir(localPath, function (err, localList) {
-					if (err) throw err;
-					var newUploads = underscore.difference(localList, remoteList);
-					var toDelete = underscore.difference(remoteList, localList);
-					project.toSync.remoteAdd = project.toSync.remoteAdd.concat(newUploads);
-					project.toSync.remoteRemove = project.toSync.remoteRemove.concat(toDelete);
-					if (lastFile)
-						console.log("emitting " + functionName);
-						project.emit(functionName);
-					});
-				});
-			}(this, index == 0);
+Sync.prototype.initialize = function() {
+	// Initialize the syncer
+	if (this.config == null) {
+		var syncer = this;
+		this.config = JSON.parse(fs.readFileSync(this.configurationPath));
 		}
 	return this;
 	}
 
-module.exports = Project;
+Sync.prototype.run = function() {
+	// Run the syncing process
+	return this.connect().calculate().sync();
+	}
+
+Sync.prototype.connect = function() {
+	// Connect to the server
+	if (this.connection == null) {
+		var syncer = this;
+		this.connection = new Connection();
+
+		this.connection.connect({
+			host: this.config.host,
+			port: this.config.port,
+			username: this.config.username,
+			password: this.config.password
+			});
+
+		this.connection.once('ready', function() {
+			syncer.emit('connection-ready');
+			syncer.connection.sftp(function (err, sftp) {
+				if (err) throw err;
+				syncer.sftp = sftp;
+				console.log("Connected: " + syncer.config.username + "@" + syncer.config.host + ":" + syncer.config.port);
+				syncer.emit('sftp-ready');
+				syncer.emit('ready');
+				});
+			});
+
+		this.once('close', function () {
+			syncer.close()
+			});
+		}
+
+	return this;
+	}
+
+Sync.prototype.close = function() {
+	// Close the server install
+	if (this.connection) {
+		this.connection.end();
+		this.connection = null;
+		this.sftp = null;
+		}
+	return this;
+	}
+
+Sync.prototype.calculate = function () {
+	// Calculate the changes to be synced
+	if (! this.toSync.syncCalculated) {
+		var syncer = this;
+		if (this.sftp == null) {
+			this.once('ready', function() {
+				syncer.calculate();
+				});
+			}
+		else {
+			var totalSteps = this.config.local.directories.length;
+			this.on('sync-step', function () {
+				if (++syncer.toSync.stepsCompleted == totalSteps) {
+					syncer.toSync.syncCalculated = true;
+					syncer.emit('sync-calculated');
+					}
+				});
+			for (var index = 0; index < totalSteps; index++) {
+				var relativeLocal = this.config.local.directories[index];
+				var localPath = this.config.local.root + relativeLocal;
+				var remotePath = this.config.remote.root + relativeLocal;
+				calculateSyncDir(this, localPath, remotePath);
+				}
+			}
+		}
+
+	return this;
+	}
+
+Sync.prototype.sync = function() {
+	// Sync with the database
+	var syncer = this;
+	if (this.sftp == null) {
+		this.once('ready', function () { // once the connection is ready, we can proceed
+			syncer.sync();
+			});
+		}
+	else if (! this.toSync.syncCalculated) {
+		this.once('sync-calculated', function () { // once the sync is calculated, we can proceed
+			syncer.sync();
+			});
+		}
+	else if (! this.toSync.syncCompleted) { // sync all files
+		syncFiles(this, this.sftp, this.toSync);
+		}
+	return this;
+	}
+
+function calculateSyncDir(syncer, localPath, remotePath) {
+	// Calculate the sync for one directory
+	var sftp = syncer.sftp;
+	fs.readdir(localPath, function (err, localFiles) {
+		if (err) throw err;
+		console.log("\tLocal directory " + localPath + " read!");
+		sftp.readdir(remotePath, function (err, remoteFiles) {
+			var calculateDifferences = function (remoteFiles) {
+				console.log("\tRemote directory " + remotePath + " read!");
+				var  remoteFilenames = _.map(remoteFiles, function (item) {return item.filename});
+				var toAdd = _.difference(localFiles, remoteFilenames);
+				var mayUpdate = _.intersection(localFiles, remoteFilenames);
+				var toDelete = _.map(_.difference(remoteFilenames, localFiles), function (path) {return remotePath + "/" + path});
+				var remoteMapping = _.object(remoteFilenames, remoteFiles);
+
+				for (var fileIndex = 0; fileIndex < toAdd.length; fileIndex++) {
+					var fileName = toAdd[fileIndex];
+					var localFilePath = localPath + "/" + fileName;
+					var remoteFilePath = remotePath + "/" + fileName;
+					syncer.toSync.remoteAdd[localFilePath] = remoteFilePath;
+					}
+				for (var fileIndex = 0; fileIndex < mayUpdate.length; fileIndex++) {
+					var fileName = mayUpdate[fileIndex];
+					var localFilePath = localPath + "/" + fileName;
+					var remoteFilePath = remotePath + "/" + fileName;
+					var localMtime = fs.statSync(localFilePath).mtime.getTime() / 1000;
+					var remoteMTime = remoteMapping[fileName].attrs.mtime;
+					if (localMtime > remoteMTime) {
+						syncer.toSync.remoteUpdate[localFilePath] = remoteFilePath;
+						}
+					}
+				syncer.toSync.remoteDelete = syncer.toSync.remoteDelete.concat(toDelete);
+				syncer.emit('sync-step');
+				}
+
+			if (err == "Error: No such file") { // if path doesn't exist, make it and try again
+				sftp.mkdir(remotePath, function (err) {
+					if (err) throw err;
+					console.log("Remote directory, " + remotePath + " created");
+					sftp.readdir(remotePath, function (err, remoteFiles) {
+						if (err) throw err;
+						calculateDifferences(remoteFiles);
+						})
+					});
+				}
+			else if (err) throw err;
+			calculateDifferences(remoteFiles);
+			});
+		});
+	}
+
+function syncFiles(emitter, sftp, sync) {
+	// Syncs files to the server
+	console.log("\n\tStarting File Sync...");
+	var totalLength = Object.keys(sync.remoteAdd).length + Object.keys(sync.remoteUpdate).length + sync.remoteDelete.length;
+	if (totalLength == 0) {
+		console.log("\t\tLocal and remote directories already synced!");
+		emitter.emit('done');
+		}
+
+	emitter.on('sync-file', function () {
+		if (++sync.filesCompleted == totalLength) {
+			emitter.toSync.syncCompleted = true;
+			emitter.emit('done');
+			}
+		});
+
+	for (var localPath in sync.remoteAdd) {
+		var remotePath = sync.remoteAdd[localPath];
+		(function (localPath, remotePath) {
+			sftp.fastPut(localPath, remotePath, function (err) {
+				if (err) throw err;
+				console.log("\t\tLocal: " + localPath + " --> " + remotePath);
+				emitter.emit('sync-file');
+				});
+			}(localPath, remotePath));
+		}
+
+	for (var index = 0; index < sync.remoteDelete.length; index++) {
+		var remotePath = sync.remoteDelete[index];
+		(function (remotePath) {
+			sftp.unlink(remotePath, function (err) {
+				if (err) throw err;
+				console.log("\t\tRemote: " + remotePath + " deleted.");
+				emitter.emit('sync-file');
+				});
+			}(remotePath));
+		}
+
+	for (var localPath in sync.remoteUpdate) {
+		var remotePath = sync.remoteUpdate[localPath];
+		(function (localPath, remotePath) {
+			sftp.unlink(remotePath, function (err) {
+				if (err) throw err;
+				console.log("\t\tRemote: " + remotePath + " deleted.");
+				sftp.fastPut(localPath, remotePath, function (err) {
+					if (err) throw err;
+					console.log("\t\tLocal: " + localPath + " --> " + remotePath);
+					emitter.emit('sync-file');
+					});
+				});
+			}(localPath, remotePath));
+		}
+	}
+
+function main() {
+	// Main function
+	var syncer = new Sync(".deploy-config");
+	syncer.run();
+	syncer.once("close", function () {
+		process.exit();
+		});
+	}
+
+if (require.main === module) {
+	main();
+	}
+else {
+	module.exports = Sync;
+	}
