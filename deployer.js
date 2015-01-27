@@ -18,11 +18,13 @@ function Sync(path) {
 	this.config = null;
 	this.connection = null;
 	this.sftp = null;
-	this.toSync = {
+	this.status = {
 		syncCalculated: false,
-		syncCompleted: true,
+		syncCompleted: false,
 		stepsCompleted: 0,
-		filesCompleted: 0,
+		filesCompleted: 0
+		}
+	this.toSync = {
 		remoteAdd: {},
 		remoteUpdate: {},
 		remoteDelete: [],
@@ -69,7 +71,7 @@ Sync.prototype.connect = function() {
 				});
 			});
 
-		this.once('close', function () {
+		this.once('done', function () {
 			syncer.close()
 			});
 		}
@@ -89,7 +91,7 @@ Sync.prototype.close = function() {
 
 Sync.prototype.calculate = function () {
 	// Calculate the changes to be synced
-	if (! this.toSync.syncCalculated) {
+	if (! this.status.syncCalculated) {
 		var syncer = this;
 		if (this.sftp == null) {
 			this.once('ready', function() {
@@ -99,8 +101,8 @@ Sync.prototype.calculate = function () {
 		else {
 			var totalSteps = this.config.local.directories.length;
 			this.on('sync-step', function () {
-				if (++syncer.toSync.stepsCompleted == totalSteps) {
-					syncer.toSync.syncCalculated = true;
+				if (++syncer.status.stepsCompleted == totalSteps) {
+					syncer.status.syncCalculated = true;
 					syncer.emit('sync-calculated');
 					}
 				});
@@ -124,12 +126,12 @@ Sync.prototype.sync = function() {
 			syncer.sync();
 			});
 		}
-	else if (! this.toSync.syncCalculated) {
+	else if (! this.status.syncCalculated) {
 		this.once('sync-calculated', function () { // once the sync is calculated, we can proceed
 			syncer.sync();
 			});
 		}
-	else if (! this.toSync.syncCompleted) { // sync all files
+	else if (! this.status.syncCompleted) { // sync all files
 		syncFiles(this, this.sftp, this.toSync);
 		}
 	return this;
@@ -196,8 +198,8 @@ function syncFiles(emitter, sftp, sync) {
 		}
 
 	emitter.on('sync-file', function () {
-		if (++sync.filesCompleted == totalLength) {
-			emitter.toSync.syncCompleted = true;
+		if (++emitter.status.filesCompleted == totalLength) {
+			emitter.status.sync = true;
 			emitter.emit('done');
 			}
 		});
@@ -244,7 +246,7 @@ function main() {
 	// Main function
 	var syncer = new Sync(".deploy-config");
 	syncer.run();
-	syncer.once("close", function () {
+	syncer.once('done', function () {
 		process.exit();
 		});
 	}

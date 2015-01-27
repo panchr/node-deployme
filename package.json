@@ -1,10 +1,10 @@
 {
   "name": "deployme",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "An automated tool to deploy untracked files to servers (such as images) through the use of SFTP",
-  "main": "./cli.js",
+  "main": "./deployer.js",
   "bin": { 
-    "deployme": "./cli.js"
+    "deployme": "./bin/cli"
     },
     "scripts": {
       "test": ""
