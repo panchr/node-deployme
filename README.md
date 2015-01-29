@@ -51,18 +51,18 @@ Otherwise, the configuration options are stored as standard JSON.
 For example, here is a sample configuration file:
 ```json
 {
-    "host": "myserver.io",
-    "port" 22,
-    "username": "panchr",
-    "password": "v3rys3cure",
-    "local": {
-        "root": "static",
-        "directories": ["images", "icons"],
-        "files": ["myfavicon.ico", "secure.js"]
-    },
-    "remote": {
-        "root": "/var/www/site"
-    }
+	"host": "myserver.io",
+	"port": 22,
+	"username": "panchr",
+	"password": "v3rys3cure",
+	"local": {
+		"root": "static",
+		"directories": ["images", "icons"],
+		"files": ["myfavicon.ico", "secure.js"]
+	},
+	"remote": {
+		"root": "/var/www/site"
+	}
 }
 ```
 
