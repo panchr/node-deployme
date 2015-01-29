@@ -1,6 +1,6 @@
 {
   "name": "deployme",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "An automated tool to deploy untracked files to servers (such as images) through the use of SFTP",
   "main": "./deployer.js",
   "bin": { 

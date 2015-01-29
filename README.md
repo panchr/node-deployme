@@ -30,6 +30,42 @@ Again, I highly recommend using `npm` instead.
 
 ---
 
+## Configuration
+The CLI tool uses the default configuration file, `.deploy-config`. To generate a standard configuration file, run `deployme init`.
+
+Otherwise, the configuration options are stored as standard JSON.
+
+|name|description|type|default value|
+|----|-----------|----|-------------|
+|host|The host name of the server|String|"localhost"
+|port|Port to connect to the server with|int|22
+|username|The username to connect with|String|"root"
+|password|The password of the above user|String|""
+|local|An object of local configuration|Object|{}
+|local.root|The local root of the files to sync|String|"."
+|local.directories|The local directories to sync|Array|[]
+|local.files|The local files to sync **(not supported yet)**|Array|[]
+|remote|An object of remote configuration|Object|{}
+|remote.root|The remote root to sync to|String|"/"
+
+For example, here is a sample configuration file:
+```json
+{
+    "host": "myserver.io",
+    "port" 22,
+    "username": "panchr",
+    "password": "v3rys3cure",
+    "local": {
+        "root": "static",
+        "directories": ["images", "icons"],
+        "files": ["myfavicon.ico", "secure.js"]
+    },
+    "remote": {
+        "root": "/var/www/site"
+    }
+}
+```
+
 ## Usage
 `deployme` comes with a few useful commands:
 - [init](#init)

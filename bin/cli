@@ -28,8 +28,10 @@ var INPUT_PROPERTIES= [
 var HELP_DATA = {
 	"help": "Displays the help data",
 	"init": "Initialize the deploy script configuration",
-	"edit": "Edit the configuration script",
-	"reset": "Delete the configuration and start over"
+	"reset": "Delete the configuration and start over",
+	"view": "View the current configuration",
+	"diff": "Get a list of changes to be synced",
+	"sync": "Push the changes to the server"
 	}
 
 prompt.message = "";

@@ -12,8 +12,13 @@ var fs = require("fs"),
 
 var emitter = new EventEmitter();
 
+/**
+* The Sync object allows you to control upstream deployment
+* @class Sync
+* @constructor
+* @param {String} path filepath of the configuration file
+*/
 function Sync(path) {
-	// Create a new file syncer
 	this.configurationPath = path;
 	this.config = null;
 	this.connection = null;
@@ -33,6 +38,10 @@ function Sync(path) {
 
 util.inherits(Sync, EventEmitter);
 
+/**
+* Initialize the sync object and load the configuration
+* @return {Sync} the current object for method chaining
+*/
 Sync.prototype.initialize = function() {
 	// Initialize the syncer
 	if (this.config == null) {
@@ -42,11 +51,19 @@ Sync.prototype.initialize = function() {
 	return this;
 	}
 
+/**
+* Connect to the server, calculate changes, and the sync the changes
+* @return {Sync} the current object for method chaining
+*/
 Sync.prototype.run = function() {
 	// Run the syncing process
 	return this.connect().calculate().sync();
 	}
 
+/**
+* Connect to the remote server
+* @return {Sync} the current object for method chaining
+*/
 Sync.prototype.connect = function() {
 	// Connect to the server
 	if (this.connection == null) {
@@ -79,6 +96,10 @@ Sync.prototype.connect = function() {
 	return this;
 	}
 
+/**
+* Close the server connection
+* @return {Sync} the current object for method chaining
+*/
 Sync.prototype.close = function() {
 	// Close the server install
 	if (this.connection) {
@@ -89,6 +110,10 @@ Sync.prototype.close = function() {
 	return this;
 	}
 
+/**
+* Calculate the changes to be synced
+* @return {Sync} the current object for method chaining
+*/
 Sync.prototype.calculate = function () {
 	// Calculate the changes to be synced
 	if (! this.status.syncCalculated) {
@@ -118,6 +143,10 @@ Sync.prototype.calculate = function () {
 	return this;
 	}
 
+/**
+* Sync the changes to the server
+* @return {Sync} the current object for method chaining
+*/
 Sync.prototype.sync = function() {
 	// Sync with the database
 	var syncer = this;
@@ -137,6 +166,12 @@ Sync.prototype.sync = function() {
 	return this;
 	}
 
+/**
+* Calculate the sync changes required for a given directory
+* @param {Sync} syncer Sync object to use
+* @param {String} localPath local path to check for changes
+* @param {String} remotePath remote path to check for changes
+*/
 function calculateSyncDir(syncer, localPath, remotePath) {
 	// Calculate the sync for one directory
 	var sftp = syncer.sftp;
@@ -188,6 +223,12 @@ function calculateSyncDir(syncer, localPath, remotePath) {
 		});
 	}
 
+/**
+* Sync the files to the server
+* @param {EventEmitter} emitter an object that supports async event missions
+* @param {ssh2.SFTP} sftp the SFTP object
+* @param {Sync} sync the Sync object
+*/
 function syncFiles(emitter, sftp, sync) {
 	// Syncs files to the server
 	console.log("\n\tStarting File Sync...");
@@ -242,6 +283,10 @@ function syncFiles(emitter, sftp, sync) {
 		}
 	}
 
+/**
+* Main method, which uses the default .deploy-config file
+* @return {Sync} the Sync object
+*/
 function main() {
 	// Main function
 	var syncer = new Sync(".deploy-config");
@@ -249,6 +294,7 @@ function main() {
 	syncer.once('done', function () {
 		process.exit();
 		});
+	return syncer;
 	}
 
 if (require.main === module) {
