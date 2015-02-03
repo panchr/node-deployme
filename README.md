@@ -96,15 +96,15 @@ Finally, `deployme sync` will calculate the required changes to be synced and th
 
 |Subcommand|Argument|Description|Example|
 |----------------|------------|-------------|----------|
-|`change`|filepath|Set the local root path to "filepath"|`deployme local change /static`|
-|`add dir`|filepath|Add a local directory to be synced|`deployme local add dir /test`|
-|`add file`|filepath|Add a local file to be synced|`deployme local add file styles.css`|
-|`remove dir`|filepath|Remove a local directory to be synced|`deployme local remove dir /test`|
-|`remove file`|filepath|Remove a local file to be synced|`deployme local remove file /test`|
+|`root`|path|Set the local root path to the file path|`deployme local root /static`|
+|`add`|path|Add a local path to be synced|`deployme local add /test`|
+|`add`|glob pattern|Add matching local paths to be synced|`deployme local add *.css`|
+|`remove`|path|Remove a local path from being synced|`deployme local remove mystyle.css`|
+|`remove`|glob pattern|Remove matching local paths from being synced|`deployme local remove test/*`|
 
 ### remote
 `deployme remote` only provides one command so far, but more will be added soon. Each subcommand allows you to configure the remote settings of the syncer:
 
 |Subcommand|Argument|Description|Example|
 |----------------|------------|-------------|----------|
-|`change`|filepath|Set the remote root path to "filepath"|`deployme remote change /var/www/static`|
+|`root`|filepath|Set the remote root path to "filepath"|`deployme remote root /var/www/static`|

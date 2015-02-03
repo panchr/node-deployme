@@ -5,9 +5,12 @@
 // Licensed under GPL v2.0
 // Part of the deployme package
 
+var fs = require("fs");
+
 var minimist = require("minimist"),
 	prompt = require("prompt"),
 	_ = require("underscore"),
+	glob = require("glob"),
 	Deployer = require("../deployer");
 
 // Global configuration
@@ -29,7 +32,11 @@ var HELP_DATA = {
 	"reset": "Delete the configuration and start over",
 	"view": "View the current configuration",
 	"diff": "Get a list of changes to be synced",
-	"sync": "Push the changes to the server"
+	"sync": "Push the changes to the server",
+	"local add": "Add local paths to the be synced",
+	"local remove": "Remove local paths to be synced",
+	"local root": "Change the local root path",
+	"remote root": "Change the remote root path",
 	}
 
 var MESSAGES = {
@@ -45,7 +52,7 @@ prompt.message = "";
 prompt.delimiter = "";
 
 var project = new Deployer(".deploy-config");
-
+// use "glob" module to find files
 function main() {
 	// Main function
 	var cli = minimist(process.argv);
@@ -88,79 +95,36 @@ function main() {
 			}
 		else if (command("remote")) {
 			remoteIndex = cmds.indexOf("remote");
-			if (command("change", remoteIndex + 1)) {
-				var newRoot = cmds[remoteIndex + 2];
-				if (! newRoot)
-					error("No remote path provided!");
-				else {
-					project.config.remote.root = newRoot;
-					project.save();
-					closeProject("New Remote Path: " + newRoot);
-					}
-				}
+			if (command("root", remoteIndex + 1))
+				changeRoot("remote", cmds);
 			else
 				error("Remote command not recognized!");
 			}
 		else if (command("local")) {
 			localIndex = cmds.indexOf("local");
-			if (command("change", localIndex + 1)) {
-				var newRoot = cmds[localIndex + 2];
-				if (! newRoot)
-					error("No local path provided!");
-				else {
-					project.config.local.root = newRoot;
-					project.save();
-					closeProject("New Local Path: " + newRoot);
-					}
-				}
-			else if (command("add", localIndex + 1)) {
-				var toAdd = cmds[localIndex + 3];
-				if (! toAdd)
-					error("No local path was provided!");
-				else if (command("dir", localIndex + 2)) {
-					project.config.local.directories.push(toAdd);
-					project.save();
-					closeProject("New Directory added: " + toAdd);
-					}
-				else if (command("file", localIndex + 2)) {
-					project.config.local.files.push(toAdd);
-					project.save();
-					closeProject("New File added: " + toAdd);
-					}
-				else
-					error("Can only add local directories or files!");
-				}
-			else if (command("remove", localIndex + 1)) {
-				var toDel = cmds[localIndex + 3];
-				if (! toDel)
-					error("No local path was provided!");
-				else if (command("dir", localIndex + 2)) {
-					var index = project.config.local.directories.indexOf(toDel);
-					if (index == -1)
-						error("Local directory not found in configuration: " + toDel);
-					else {
-						project.config.local.directories.splice(index, index);
-						project.save();
-						closeProject("Local directory removed: " + toDel);
-						}
-					}
-				else if (command("file", localIndex + 2)) {
-					var index = project.config.local.files.indexOf(toDel);
-					if (index == -1)
-						error("Local file not found in configuration: " + toDel);
-					else {
-						project.config.local.files.splice(index, index);
-						project.save();
-						closeProject("Local file removed: " + toDel);
-						}
-					}
-				}
+			if (command("root", localIndex + 1))
+				changeRoot("local", cmds);
 			else
-				error("Local command not recognized!");
+				changeSyncPaths("local", cmds);
 			}
 		else
 			error("Command not found!");
 		}
+	}
+
+function closeProject(message) {
+	// Closes the project and exits the process
+	if (message)
+		console.log(message);
+	project.close();
+	process.exit(0);
+	}
+
+function error(message) {
+	// Print out a message and exit the process
+	console.log(message);
+	project.close();
+	process.exit(1);
 	}
 
 function initializeProject(promptString) {
@@ -190,19 +154,67 @@ function initializeProject(promptString) {
 		});
 	}
 
-function closeProject(message) {
-	// Closes the project and exits the process
-	if (message)
-		console.log(message);
-	project.close();
-	process.exit(0);
+function changeRoot(type, cmds) {
+	// Changes a root path
+	var index = cmds.indexOf(type);
+	var newRoot = cmds[index + 2];
+	if (! newRoot)
+		error("No " + type + " path provided!");
+	else {
+		project.config[type].root = newRoot;
+		project.save();
+		closeProject("New " + type + " Path: " + newRoot);
+		}
 	}
 
-function error(message) {
-	// Print out a message and exit the process
-	console.log(message);
-	project.close();
-	process.exit(1);
+function changeSyncPaths(type, cmds) {
+	// Changes a sync path
+	var index = cmds.indexOf(type);
+	var typeChange = cmds[index + 1]; // add or remove
+	var path = cmds[index + 2]; // file path
+	if (! path)
+		error(type + " path to " + typeChange + " not provided!");
+	else if (glob.hasMagic(path)) { // globular pattern
+		paths = glob.sync(path);
+		for (var index = 0; index < paths.length; index++) {
+			addPath(type, typeChange, paths[index]);
+			}
+		}
+	else addPath(type, typeChange, path);
+	project.save();
+	console.log(type + " " + typeChange + ": " + path);
+	}
+
+function addPath(type, typeChange, path) {
+	// Adds a project to the configuration
+	try {
+		var configPath = categorizePath(path);
+		}
+	catch (e) { // cannot identify file
+		console.log(type + ": file/directory " + path + " does not exist.");
+		return;
+		}
+	var array = project.config[type][configPath];
+	if (typeChange == "add") {
+		if (array.indexOf(path) == -1) array.push(path);
+		console.log(type + " added: " + path);
+		}
+	else if (typeChange == "remove") {
+		var pathIndex = array.indexOf(path);
+		if (pathIndex == -1)
+			error(type + " path to " + typeChange + " not found in configuration: " + path);
+		else {
+			array.splice(pathIndex, pathIndex);
+			console.log(type + " removed: " + path);
+			}
+		}
+	else
+		error(type + " command not recognized!");
+	}
+
+function categorizePath(path) {
+	// Determine whether a path is a directory or a file
+	return fs.lstatSync(path).isDirectory() ? "directories": "files";
 	}
 
 main();

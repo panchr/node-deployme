@@ -1,14 +1,14 @@
 {
   "name": "deployme",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "An automated tool to deploy untracked files to servers (such as images) through the use of SFTP",
   "main": "./deployer.js",
-  "bin": { 
+  "bin": {
     "deployme": "./bin/cli"
-    },
-    "scripts": {
-      "test": ""
-      },
+  },
+  "scripts": {
+    "test": ""
+  },
   "preferGlobal": true,
   "keywords": [
     "git",
@@ -21,13 +21,14 @@
     "name": "Rushy Panchal",
     "email": "panchal.rushy@gmail.com",
     "url": "https://panchr.me"
-    },
-    "repository": {
-      "type": "git",
-      "url": "https://github.com/panchr/node-deployme"
-      },
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/panchr/node-deployme"
+  },
   "license": "GPL-2.0",
   "dependencies": {
+    "glob": "^4.3.5",
     "minimist": "^1.1.0",
     "prompt": "^0.2.14",
     "ssh2": "^0.3.6",
