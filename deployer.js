@@ -45,8 +45,19 @@ util.inherits(Sync, EventEmitter);
 Sync.prototype.initialize = function() {
 	// Initialize the syncer
 	if (this.config == null) {
-		var syncer = this;
 		this.config = JSON.parse(fs.readFileSync(this.configurationPath));
+		}
+	return this;
+	}
+
+/**
+* Initialize the sync object and load the configuration
+* @return {Sync} the current object for method chaining
+*/
+Sync.prototype.save = function() {
+	// Save the configuration
+	if (this.config) {
+		fs.writeFileSync(this.configurationPath, JSON.stringify(this.config));
 		}
 	return this;
 	}

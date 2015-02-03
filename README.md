@@ -73,6 +73,8 @@ For example, here is a sample configuration file:
 - [help](#help)
 - [diff](#diff)
 - [sync](#sync)
+- [local](#local)
+- [remote](#remote)
 
 ### init
 This is the initialization script. To use it, run `deployme init`. It will walk you through the setup of the main configuration file, `.deploy-config`.
@@ -88,3 +90,21 @@ To see what the files that need to be synced, run `deployme diff`.
 
 ### sync
 Finally, `deployme sync` will calculate the required changes to be synced and then upload the appropriate files to the remote server.
+
+### local
+`deployme local` provides a series of subcommands that allows you to configure the local settings of the syncer:
+
+|Subcommand|Argument|Description|Example|
+|----------------|------------|-------------|----------|
+|`change`|filepath|Set the local root path to "filepath"|`deployme local change /static`|
+|`add dir`|filepath|Add a local directory to be synced|`deployme local add dir /test`|
+|`add file`|filepath|Add a local file to be synced|`deployme local add file styles.css`|
+|`remove dir`|filepath|Remove a local directory to be synced|`deployme local remove dir /test`|
+|`remove file`|filepath|Remove a local file to be synced|`deployme local remove file /test`|
+
+### remote
+`deployme remote` only provides one command so far, but more will be added soon. Each subcommand allows you to configure the remote settings of the syncer:
+
+|Subcommand|Argument|Description|Example|
+|----------------|------------|-------------|----------|
+|`change`|filepath|Set the remote root path to "filepath"|`deployme remote change /var/www/static`|

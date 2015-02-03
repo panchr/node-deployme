@@ -5,8 +5,6 @@
 // Licensed under GPL v2.0
 // Part of the deployme package
 
-var fs = require("fs");
-
 var minimist = require("minimist"),
 	prompt = require("prompt"),
 	_ = require("underscore"),
@@ -34,6 +32,15 @@ var HELP_DATA = {
 	"sync": "Push the changes to the server"
 	}
 
+var MESSAGES = {
+	help: "Welcome to deployme! This is a command-line-interface (CLI) tool \
+to deploy mostly static content to servers, that would \
+otherwise add too much bulk to a git repository.\ndeployme's commands are listed below.\n",
+	init: "Welcome to deployme! To start, let's set up some configuration.\
+Delimit the list of local and remote files with commas. The lengths of each should be equal.",
+	reset: "Reseting current configuration and restarting project.",
+	}
+
 prompt.message = "";
 prompt.delimiter = "";
 
@@ -42,62 +49,117 @@ var project = new Deployer(".deploy-config");
 function main() {
 	// Main function
 	var cli = minimist(process.argv);
-	command = function(key) {
-		return (cli[key] || _.contains(cli._, key));
+	var cmds = cli._;
+	command = function(key, index) {
+		if (index != undefined && index != "undefined")
+			return key == cmds[index];
+		return (cli[key] || _.contains(cmds, key));
 		};
 
 	if (command("help")) {
-		console.log("Welcome to deployme! This is a command-line-interface (CLI) tool \
-to deploy mostly static content to servers, that would \
-otherwise add too much bulk to a git repository.");
-		console.log("\ndeployme's commands are listed below.\n");
+		console.log(MESSAGES.help);
 		for (var key in HELP_DATA) {
 			console.log("\t" + key.green + ": " + HELP_DATA[key]);
 			}
 		}
-	else if (command("init")) {
-		initializeProject("Welcome to deployme! To start, let's set up some configuration.\
-Delimit the list of local and remote lists with commas. The lengths of each should be equal.");
-		}
-	else if (command("reset")) {
-		initializeProject("Reseting current configuration and restarting project.");
-		}
+	else if (command("init"))
+		initializeProject(MESSAGES.init);
+	else if (command("reset"))
+		initializeProject(MESSAGES.reset);
 	else {
 		project.initialize(); // load configuration and connect to the server
-		if (command("view")) {
-			console.log(project.config);
-			}
+
+		if (command("view"))
+			closeProject(project.config);
 		else if (command("diff")) {
 			project.connect().calculate();
 			if (! project.status.syncCalculated) {
 				project.once('sync-calculated', function () {
-					console.log(project.toSync);
-					project.close();
-					process.exit();
+					closeProject(project.toSync);
 					});
 				}
-			else {
-				console.log(project.toSync);
-				project.close();
-				process.exit();
-				}
+			else
+				closeProject(project.toSync);
 			}
 		else if (command("sync")) {
 			project.run();
-			if (project.status.syncCompleted) {
-				project.close();
-				process.exit();
-				}
-			else {
-				project.once('done', function () {
-					project.close();
-					process.exit();
-					});
-				}
+			if (project.status.syncCompleted) closeProject();
+			else project.once('done', closeProject);
 			}
-		else {
-			console.log("Command not found!");
+		else if (command("remote")) {
+			remoteIndex = cmds.indexOf("remote");
+			if (command("change", remoteIndex + 1)) {
+				var newRoot = cmds[remoteIndex + 2];
+				if (! newRoot)
+					error("No remote path provided!");
+				else {
+					project.config.remote.root = newRoot;
+					project.save();
+					closeProject("New Remote Path: " + newRoot);
+					}
+				}
+			else
+				error("Remote command not recognized!");
 			}
+		else if (command("local")) {
+			localIndex = cmds.indexOf("local");
+			if (command("change", localIndex + 1)) {
+				var newRoot = cmds[localIndex + 2];
+				if (! newRoot)
+					error("No local path provided!");
+				else {
+					project.config.local.root = newRoot;
+					project.save();
+					closeProject("New Local Path: " + newRoot);
+					}
+				}
+			else if (command("add", localIndex + 1)) {
+				var toAdd = cmds[localIndex + 3];
+				if (! toAdd)
+					error("No local path was provided!");
+				else if (command("dir", localIndex + 2)) {
+					project.config.local.directories.push(toAdd);
+					project.save();
+					closeProject("New Directory added: " + toAdd);
+					}
+				else if (command("file", localIndex + 2)) {
+					project.config.local.files.push(toAdd);
+					project.save();
+					closeProject("New File added: " + toAdd);
+					}
+				else
+					error("Can only add local directories or files!");
+				}
+			else if (command("remove", localIndex + 1)) {
+				var toDel = cmds[localIndex + 3];
+				if (! toDel)
+					error("No local path was provided!");
+				else if (command("dir", localIndex + 2)) {
+					var index = project.config.local.directories.indexOf(toDel);
+					if (index == -1)
+						error("Local directory not found in configuration: " + toDel);
+					else {
+						project.config.local.directories.splice(index, index);
+						project.save();
+						closeProject("Local directory removed: " + toDel);
+						}
+					}
+				else if (command("file", localIndex + 2)) {
+					var index = project.config.local.files.indexOf(toDel);
+					if (index == -1)
+						error("Local file not found in configuration: " + toDel);
+					else {
+						project.config.local.files.splice(index, index);
+						project.save();
+						closeProject("Local file removed: " + toDel);
+						}
+					}
+				}
+			else
+				error("Local command not recognized!");
+			}
+		else
+			error("Command not found!");
 		}
 	}
 
@@ -121,11 +183,26 @@ function initializeProject(promptString) {
 				root: result.remoteRoot,
 				}
 			};
-
-		fs.writeFileSync(".deploy-config", JSON.stringify(config));
+		project.config = config;
+		project.save();
 		console.log("Deploy configuration file, " + project.configurationPath.green + ", created with the provided options.\nDone initializing project!");
-		process.exit();
+		process.exit(0);
 		});
+	}
+
+function closeProject(message) {
+	// Closes the project and exits the process
+	if (message)
+		console.log(message);
+	project.close();
+	process.exit(0);
+	}
+
+function error(message) {
+	// Print out a message and exit the process
+	console.log(message);
+	project.close();
+	process.exit(1);
 	}
 
 main();
