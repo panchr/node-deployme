@@ -46,6 +46,7 @@ Sync.prototype.initialize = function() {
 	// Initialize the syncer
 	if (this.config == null) {
 		this.config = JSON.parse(fs.readFileSync(this.configurationPath));
+		process.chdir(path.dirname(this.configurationPath));
 		}
 	return this;
 	}
