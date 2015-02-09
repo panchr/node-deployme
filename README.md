@@ -32,8 +32,11 @@ Again, I highly recommend using `npm` instead.
 
 ## Configuration
 The CLI tool uses the default configuration file, `.deploy-config`. To generate a standard configuration file, run `deployme init`.
+This will generate the configuration file in the current directory.
 
-Otherwise, the configuration options are stored as standard JSON.
+*Note: `deployme` will search for a `.deploy-config` file in any of the parent directories of the current working directory. So, it is possible to run the tool in any subdirectory of a project.*
+
+The configuration options are stored as standard JSON.
 
 |name|description|type|default value|
 |----|-----------|----|-------------|

@@ -5,7 +5,8 @@
 // Licensed under GPL v2.0
 // Part of the deployme package
 
-var fs = require("fs");
+var fs = require("fs"),
+	path = require("path");
 
 var minimist = require("minimist"),
 	prompt = require("prompt"),
@@ -51,8 +52,13 @@ Delimit the list of local and remote files with commas. The lengths of each shou
 prompt.message = "";
 prompt.delimiter = "";
 
-var project = new Deployer(".deploy-config");
-// use "glob" module to find files
+try {
+	var project = new Deployer(findPath(".deploy-config"));
+	}
+catch (e) {
+	var project = new Deployer(".deploy-config");
+	}
+
 function main() {
 	// Main function
 	var cli = minimist(process.argv);
@@ -152,6 +158,25 @@ function initializeProject(promptString) {
 		console.log("Deploy configuration file, " + project.configurationPath.green + ", created with the provided options.\nDone initializing project!");
 		process.exit(0);
 		});
+	}
+
+function findPath(name, base) {
+	// Recursively finds the file in a parent directory
+	if (! base) {
+		var base = ".";
+		}
+	var current = fs.readdirSync(base),
+		parent = path.join(base, "..");
+
+	if (current.indexOf(name) >= 0) {
+		return path.resolve(path.join(base, name));
+		}
+	else if (path.resolve(base) == path.resolve(parent)) { // reached the max level
+		throw new Error("Could not find file: " + name);
+		}
+	else {
+		return findPath(name, parent);
+		}
 	}
 
 function changeRoot(type, cmds) {
